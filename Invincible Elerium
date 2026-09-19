@@ -1,4 +1,9 @@
---INV ON TOP--
+--INVONTOP--
+
+
+
+
+
 
 local Library = {
     main_color = Color3.fromRGB(0, 0, 0),
@@ -92,7 +97,7 @@ Title.Text = "Window"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Active = true -- drag is handled on Title for PC + mobile reliability
+Title.Active = true
 
 local TabSelection = Instance.new("ImageLabel")
 TabSelection.Name = "TabSelection"
@@ -322,7 +327,7 @@ FolderButton.Name = "Button"
 FolderButton.Parent = Folder
 FolderButton.BackgroundTransparency = 1
 FolderButton.BorderSizePixel = 0
-FolderButton.Size = UDim2.new(1, 0, 1, 0)
+FolderButton.Size = UDim2.new(1, 0, 0, 22)
 FolderButton.ZIndex = 2
 FolderButton.Font = Enum.Font.Fondamento
 FolderButton.Text = "      Folder"
@@ -747,7 +752,7 @@ function LibraryAPI:AddWindow(title, options)
     window.Title.Position = UDim2.new(0, 28, 0, 2)
     window.Title.Size = UDim2.new(1, -40, 0, 20)
     window.Title.TextXAlignment = Enum.TextXAlignment.Center
-    window.Title.Active = true -- allows reliable drag start on PC + mobile
+    window.Title.Active = true
 
     bar.BackgroundTransparency = options.title_bar_transparency
     ApplyGradient(bar, options.title_bar, 0)
@@ -825,12 +830,11 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- Reliable title-bar / window dragging (PC + mobile)
+    -- ==================== FIXED DRAGGING (PC + Mobile) ====================
     do
         local dragging = false
         local dragStart, startPos
         local canDrag = true
-        local dragInput = nil
 
         resizer.MouseEnter:Connect(function()
             canDrag = false
@@ -839,33 +843,23 @@ function LibraryAPI:AddWindow(title, options)
             canDrag = true
         end)
 
-        bar.InputBegan:Connect(function(input)
-            if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-                and canDrag and not draggingBlocked and not animating
-            then
-                dragging = true
-                dragStart = input.Position
-                startPos = window.Position
-                dragInput = input
+        local function beginDrag(input)
+            if not canDrag or draggingBlocked or animating then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
             end
-        end)
 
-        -- Also allow starting drag from the Title label
-        window.Title.InputBegan:Connect(function(input)
-            if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-                and canDrag and not draggingBlocked and not animating
-            then
-                dragging = true
-                dragStart = input.Position
-                startPos = window.Position
-                dragInput = input
-            end
-        end)
+            dragging = true
+            dragStart = input.Position
+            startPos = window.Position
+        end
+
+        bar.InputBegan:Connect(beginDrag)
+        window.Title.InputBegan:Connect(beginDrag)
 
         Connect(UserInputService.InputChanged, function(input)
-            if dragging and dragInput and input == dragInput
-                and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch)
-            then
+            if not dragging then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
                 local delta = input.Position - dragStart
                 window.Position = UDim2.new(
                     startPos.X.Scale,
@@ -877,15 +871,12 @@ function LibraryAPI:AddWindow(title, options)
         end)
 
         Connect(UserInputService.InputEnded, function(input)
-            if input == dragInput
-                or input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.UserInputType == Enum.UserInputType.Touch
-            then
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
-                dragInput = nil
             end
         end)
     end
+    -- ======================================================================
 
     do
         local oldIcon = Mouse.Icon
