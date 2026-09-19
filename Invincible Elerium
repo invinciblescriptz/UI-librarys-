@@ -819,26 +819,35 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- Proper dragging (title bar only)
     do
         local dragging = false
-        local dragStart = nil
-        local startPos = nil
+        local dragStart, startPos
         local canDrag = true
 
-        bar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                if canDrag and not collapsed and not draggingBlocked and not animating then
-                    dragging = true
-                    dragStart = input.Position
-                    startPos = window.Position
+        resizer.MouseEnter:Connect(function()
+            canDrag = false
+        end)
+        resizer.MouseLeave:Connect(function()
+            canDrag = true
+        end)
 
-                    input.Changed:Connect(function()
-                        if input.UserInputState == Enum.UserInputState.End then
-                            dragging = false
+        bar.InputBegan:Connect(function(input)
+            if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
+                and canDrag and not collapsed and not draggingBlocked and not animating
+            then
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Position
+
+                local conn
+                conn = input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                        if conn then
+                            conn:Disconnect()
                         end
-                    end)
-                end
+                    end
+                end)
             end
         end)
 
@@ -852,14 +861,6 @@ function LibraryAPI:AddWindow(title, options)
                     startPos.Y.Offset + delta.Y
                 )
             end
-        end)
-
-        -- Resizer hover blocks dragging
-        resizer.MouseEnter:Connect(function()
-            canDrag = false
-        end)
-        resizer.MouseLeave:Connect(function()
-            canDrag = true
         end)
     end
 
