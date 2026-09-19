@@ -759,7 +759,7 @@ function LibraryAPI:AddWindow(title, options)
     window.ImageTransparency = options.background_transparency
     ApplyGradient(window, options.background, 45)
 
-   local collapsed = false
+    local collapsed = false
     local animating = false
     local savedHeight = options.min_size.Y
     local resizer = window.Resizer
@@ -818,7 +818,50 @@ function LibraryAPI:AddWindow(title, options)
     end)
 
     local windowAPI = {}
-    window.Draggable = true
+
+    -- Proper dragging (title bar only)
+    do
+        local dragging = false
+        local dragStart = nil
+        local startPos = nil
+        local canDrag = true
+
+        bar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                if canDrag and not collapsed and not draggingBlocked and not animating then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = window.Position
+
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            dragging = false
+                        end
+                    end)
+                end
+            end
+        end)
+
+        Connect(UserInputService.InputChanged, function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                window.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+
+        -- Resizer hover blocks dragging
+        resizer.MouseEnter:Connect(function()
+            canDrag = false
+        end)
+        resizer.MouseLeave:Connect(function()
+            canDrag = true
+        end)
+    end
 
     do
         local oldIcon = Mouse.Icon
@@ -827,7 +870,6 @@ function LibraryAPI:AddWindow(title, options)
         local resizeConn
 
         resizer.MouseEnter:Connect(function()
-            window.Draggable = false
             if options.can_resize then
                 oldIcon = Mouse.Icon
             end
@@ -839,7 +881,6 @@ function LibraryAPI:AddWindow(title, options)
             if options.can_resize then
                 Mouse.Icon = oldIcon
             end
-            window.Draggable = true
         end)
 
         Connect(UserInputService.InputBegan, function(input)
@@ -1149,11 +1190,9 @@ function LibraryAPI:AddWindow(title, options)
 
                 slider.MouseEnter:Connect(function()
                     hovering = true
-                    window.Draggable = false
                 end)
                 slider.MouseLeave:Connect(function()
                     hovering = false
-                    window.Draggable = true
                 end)
 
                 Connect(UserInputService.InputBegan, function(input)
@@ -1535,3 +1574,5 @@ ScreenGui.AncestryChanged:Connect(function()
         DisconnectAll()
     end
 end)
+
+return LibraryAPI
