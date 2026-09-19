@@ -1,14 +1,5 @@
 --INVONTOP--
 
-
-
-
-
-
-
-
-
-
 local Library = {
     main_color = Color3.fromRGB(0, 0, 0),
     min_size = Vector2.new(200, 200),
@@ -87,7 +78,7 @@ Toggle.Parent = Bar
 Toggle.BackgroundTransparency = 1
 Toggle.Position = UDim2.new(0, 5, 0, 2)
 Toggle.Size = UDim2.new(0, 20, 0, 20)
-Toggle.ZIndex = 2
+Toggle.ZIndex = 10
 Toggle.Image = "rbxassetid://135186061755383"
 
 local Title = Instance.new("TextLabel")
@@ -779,16 +770,18 @@ function LibraryAPI:AddWindow(title, options)
     local savedHeight = options.min_size.Y
     local resizer = window.Resizer
 
-    -- Invisible drag zone (covers the whole title bar except the toggle)
+    -- Full-width drag zone (very high ZIndex)
     local DragZone = Instance.new("TextButton")
     DragZone.Name = "DragZone"
     DragZone.Parent = window
-    DragZone.BackgroundTransparency = 1
+    DragZone.BackgroundColor3 = Color3.new(1, 1, 1)
+    DragZone.BackgroundTransparency = 0.99 -- some executors need a tiny bit of background
     DragZone.Text = ""
     DragZone.AutoButtonColor = false
-    DragZone.Size = UDim2.new(1, -30, 0, 24)
-    DragZone.Position = UDim2.new(0, 30, 0, 0)
-    DragZone.ZIndex = 999
+    DragZone.Size = UDim2.new(1, -28, 0, 24)
+    DragZone.Position = UDim2.new(0, 28, 0, 0)
+    DragZone.ZIndex = 100
+    DragZone.Active = true
 
     toggleBtn.MouseButton1Click:Connect(function()
         if animating then return end
@@ -845,52 +838,52 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- ==================== WORKING DRAG SYSTEM ====================
+    -- ==================== NUCLEAR DRAG (works on everything) ====================
     do
         local dragging = false
-        local dragInput = nil
         local dragStart = nil
         local startPos = nil
 
-        local function update(input)
-            local delta = input.Position - dragStart
+        local function beginDrag()
+            if draggingBlocked or animating then return end
+            dragging = true
+            dragStart = UserInputService:GetMouseLocation()
+            startPos = window.Position
+        end
+
+        -- Multiple ways to start the drag
+        DragZone.MouseButton1Down:Connect(beginDrag)
+        DragZone.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                beginDrag()
+            end
+        end)
+        bar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                beginDrag()
+            end
+        end)
+
+        Connect(UserInputService.InputEnded, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        -- Use RenderStepped for maximum reliability
+        Connect(RunService.RenderStepped, function()
+            if not dragging then return end
+            local mouse = UserInputService:GetMouseLocation()
+            local delta = mouse - dragStart
             window.Position = UDim2.new(
                 startPos.X.Scale,
                 startPos.X.Offset + delta.X,
                 startPos.Y.Scale,
                 startPos.Y.Offset + delta.Y
             )
-        end
-
-        DragZone.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                if draggingBlocked or animating then return end
-                dragging = true
-                dragStart = input.Position
-                startPos = window.Position
-
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                        dragInput = nil
-                    end
-                end)
-            end
-        end)
-
-        DragZone.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-            end
-        end)
-
-        Connect(UserInputService.InputChanged, function(input)
-            if input == dragInput and dragging then
-                update(input)
-            end
         end)
     end
-    -- =============================================================
+    -- ===========================================================================
 
     do
         local oldIcon = Mouse.Icon
@@ -1595,10 +1588,11 @@ function LibraryAPI:AddWindow(title, options)
         end
     end
 
-    -- Make sure the drag zone stays on top after the ZIndex boost
+    -- Force DragZone on top
     if window:FindFirstChild("DragZone") then
-        window.DragZone.ZIndex = 9999
+        window.DragZone.ZIndex = 99999
     end
+    toggleBtn.ZIndex = 100000
 
     return windowAPI, window
 end
