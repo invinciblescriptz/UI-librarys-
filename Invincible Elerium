@@ -1,5 +1,15 @@
 --INVONTOP--
 
+
+
+
+
+
+
+
+
+
+
 local Library = {
     main_color = Color3.fromRGB(0, 0, 0),
     min_size = Vector2.new(200, 200),
@@ -838,49 +848,57 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- ==================== NUCLEAR DRAG (works on everything) ====================
+    -- ==================== RELIABLE DRAG (title bar) ====================
     do
         local dragging = false
         local dragStart = nil
         local startPos = nil
 
-        local function beginDrag()
+        local function beginDrag(input)
             if draggingBlocked or animating then return end
             dragging = true
-            dragStart = UserInputService:GetMouseLocation()
+            dragStart = input.Position
             startPos = window.Position
+
+            local conn
+            conn = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    if conn then
+                        conn:Disconnect()
+                    end
+                end
+            end)
         end
 
-        -- Multiple ways to start the drag
-        DragZone.MouseButton1Down:Connect(beginDrag)
-        DragZone.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                beginDrag()
-            end
-        end)
-        bar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                beginDrag()
-            end
-        end)
-
-        Connect(UserInputService.InputEnded, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-
-        -- Use RenderStepped for maximum reliability
-        Connect(RunService.RenderStepped, function()
+        local function updateDrag(input)
             if not dragging then return end
-            local mouse = UserInputService:GetMouseLocation()
-            local delta = mouse - dragStart
+            local delta = input.Position - dragStart
             window.Position = UDim2.new(
                 startPos.X.Scale,
                 startPos.X.Offset + delta.X,
                 startPos.Y.Scale,
                 startPos.Y.Offset + delta.Y
             )
+        end
+
+        -- Start drag from DragZone (covers title area) and the bar itself
+        DragZone.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                beginDrag(input)
+            end
+        end)
+        bar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                beginDrag(input)
+            end
+        end)
+
+        -- Update position while dragging (more reliable than RenderStepped)
+        Connect(UserInputService.InputChanged, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                updateDrag(input)
+            end
         end)
     end
     -- ===========================================================================
@@ -1540,7 +1558,8 @@ function LibraryAPI:AddWindow(title, options)
                 btn.Text = "      " .. name
                 local round = btn:FindFirstChild("Round")
                 if round then
-                    round.ImageColor3 = options.main_color
+                    round.ImageTransparency = options.title_bar_transparency or 0
+                    ApplyGradient(round, options.title_bar, 0)
                 end
 
                 local open = false
