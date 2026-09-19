@@ -1,5 +1,14 @@
 --INVONTOP--
 
+
+
+
+
+
+
+
+
+
 local Library = {
     main_color = Color3.fromRGB(0, 0, 0),
     min_size = Vector2.new(200, 200),
@@ -770,17 +779,16 @@ function LibraryAPI:AddWindow(title, options)
     local savedHeight = options.min_size.Y
     local resizer = window.Resizer
 
-    -- ========== INVISIBLE DRAG ZONE (this is what actually makes it work) ==========
+    -- Invisible drag zone (covers the whole title bar except the toggle)
     local DragZone = Instance.new("TextButton")
     DragZone.Name = "DragZone"
     DragZone.Parent = window
     DragZone.BackgroundTransparency = 1
     DragZone.Text = ""
-    DragZone.Size = UDim2.new(1, -30, 0, 24) -- leaves space for the toggle button
-    DragZone.Position = UDim2.new(0, 30, 0, 0)
-    DragZone.ZIndex = 50
     DragZone.AutoButtonColor = false
-    -- ==============================================================================
+    DragZone.Size = UDim2.new(1, -30, 0, 24)
+    DragZone.Position = UDim2.new(0, 30, 0, 0)
+    DragZone.ZIndex = 999
 
     toggleBtn.MouseButton1Click:Connect(function()
         if animating then return end
@@ -837,11 +845,22 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- ========== ROCK SOLID DRAGGING ==========
+    -- ==================== WORKING DRAG SYSTEM ====================
     do
         local dragging = false
+        local dragInput = nil
         local dragStart = nil
         local startPos = nil
+
+        local function update(input)
+            local delta = input.Position - dragStart
+            window.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
 
         DragZone.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -849,28 +868,29 @@ function LibraryAPI:AddWindow(title, options)
                 dragging = true
                 dragStart = input.Position
                 startPos = window.Position
+
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                        dragInput = nil
+                    end
+                end)
+            end
+        end)
+
+        DragZone.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
             end
         end)
 
         Connect(UserInputService.InputChanged, function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStart
-                window.Position = UDim2.new(
-                    startPos.X.Scale,
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Scale,
-                    startPos.Y.Offset + delta.Y
-                )
-            end
-        end)
-
-        Connect(UserInputService.InputEnded, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
+            if input == dragInput and dragging then
+                update(input)
             end
         end)
     end
-    -- ========================================
+    -- =============================================================
 
     do
         local oldIcon = Mouse.Icon
@@ -1573,6 +1593,11 @@ function LibraryAPI:AddWindow(title, options)
         if pcall(function() return desc.ZIndex end) then
             desc.ZIndex = desc.ZIndex + WindowCount * 10
         end
+    end
+
+    -- Make sure the drag zone stays on top after the ZIndex boost
+    if window:FindFirstChild("DragZone") then
+        window.DragZone.ZIndex = 9999
     end
 
     return windowAPI, window
