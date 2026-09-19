@@ -1,10 +1,5 @@
 --INVONTOP--
 
-
-
-
-
-
 local Library = {
     main_color = Color3.fromRGB(0, 0, 0),
     min_size = Vector2.new(200, 200),
@@ -97,7 +92,7 @@ Title.Text = "Window"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Active = true
+Title.Active = false
 
 local TabSelection = Instance.new("ImageLabel")
 TabSelection.Name = "TabSelection"
@@ -752,7 +747,7 @@ function LibraryAPI:AddWindow(title, options)
     window.Title.Position = UDim2.new(0, 28, 0, 2)
     window.Title.Size = UDim2.new(1, -40, 0, 20)
     window.Title.TextXAlignment = Enum.TextXAlignment.Center
-    window.Title.Active = true
+    window.Title.Active = false
 
     bar.BackgroundTransparency = options.title_bar_transparency
     ApplyGradient(bar, options.title_bar, 0)
@@ -774,6 +769,18 @@ function LibraryAPI:AddWindow(title, options)
     local animating = false
     local savedHeight = options.min_size.Y
     local resizer = window.Resizer
+
+    -- ========== INVISIBLE DRAG ZONE (this is what actually makes it work) ==========
+    local DragZone = Instance.new("TextButton")
+    DragZone.Name = "DragZone"
+    DragZone.Parent = window
+    DragZone.BackgroundTransparency = 1
+    DragZone.Text = ""
+    DragZone.Size = UDim2.new(1, -30, 0, 24) -- leaves space for the toggle button
+    DragZone.Position = UDim2.new(0, 30, 0, 0)
+    DragZone.ZIndex = 50
+    DragZone.AutoButtonColor = false
+    -- ==============================================================================
 
     toggleBtn.MouseButton1Click:Connect(function()
         if animating then return end
@@ -830,36 +837,23 @@ function LibraryAPI:AddWindow(title, options)
 
     local windowAPI = {}
 
-    -- ==================== FIXED DRAGGING (PC + Mobile) ====================
+    -- ========== ROCK SOLID DRAGGING ==========
     do
         local dragging = false
-        local dragStart, startPos
-        local canDrag = true
+        local dragStart = nil
+        local startPos = nil
 
-        resizer.MouseEnter:Connect(function()
-            canDrag = false
-        end)
-        resizer.MouseLeave:Connect(function()
-            canDrag = true
-        end)
-
-        local function beginDrag(input)
-            if not canDrag or draggingBlocked or animating then return end
-            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
-                return
+        DragZone.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                if draggingBlocked or animating then return end
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Position
             end
-
-            dragging = true
-            dragStart = input.Position
-            startPos = window.Position
-        end
-
-        bar.InputBegan:Connect(beginDrag)
-        window.Title.InputBegan:Connect(beginDrag)
+        end)
 
         Connect(UserInputService.InputChanged, function(input)
-            if not dragging then return end
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
                 window.Position = UDim2.new(
                     startPos.X.Scale,
@@ -876,7 +870,7 @@ function LibraryAPI:AddWindow(title, options)
             end
         end)
     end
-    -- ======================================================================
+    -- ========================================
 
     do
         local oldIcon = Mouse.Icon
